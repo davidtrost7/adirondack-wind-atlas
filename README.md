@@ -1,4 +1,16 @@
-# Adirondack Wind Atlas — Terrain, Satellite, Trails & Wind (v3)
+# Adirondack Wind Atlas
+
+## v4 mobile and usability improvements (October 2026)
+
+- **Map-first navigation:** phone bottom dock with Map / Trails / Wind / Display panels. Tap the same tab to dismiss the panel. Desktop controls use the same tab categories.
+- **US customary units by default:** terrain and trail elevations in feet; distances in feet/miles; wind in mph. Switch to metric under Display. Source geometry remains UTM 18N metres. Round-foot contours use 200 ft in close-up views, 400 ft across the High Peaks, or 1,000 ft in the broad regional view, with alternate index contours labelled.
+- **Compass:** floating north arrow rotates with the camera and resets the view to north when tapped, without changing the selected location.
+- **More mountain names:** fetch named peak and hill nodes/ways from OSM, expose label-density options, and report count/fallback status. These are mapped features, not a guarantee every named summit exists in OSM.
+- **Automatic forecast refresh:** on initial load, every 30 minutes while the tab is active, and when returning to a tab that is past due. The display shows local fetch time and a next-refresh indicator. A failed refresh retains existing forecast and marks the status; it does not silently fabricate winds. This is periodic re-fetching of model predictions, not live sensor telemetry.
+- **Forecast timeline:** starts paused at the forecast hour nearest the current time instead of playing through future hours automatically. Press Play to animate.
+- **Validation:** GitHub Actions runs `npm test` after each push; check the latest run in the Actions tab.
+
+ — Terrain, Satellite, Trails & Wind (v3)
 
 ## Publish using GitHub Pages (no downloads or separate hosting account)
 
