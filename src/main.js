@@ -165,7 +165,54 @@ let imagery=null, peakData=SUMMITS, contourEls=[];
 let regionKey = 'marcy', abort = null, rebuildSerial = 0;
 let windRefreshSerial=0, windAbort=null;
 let exaggeration = 1, windHeight = 10, windSpeedup = 80;
-let frameIndex = 0, playingTimeline = true, timelineClock = 0;
+let frameIndex = 0, playingTimeline = false, timelineClock = 0;
+const REFRESH_INTERVAL_MS=30*60*1000;
+let lastWindSuccessAt=0, lastWindAttemptAt=0, windRefreshInProgress=false;
+let unitMode='imperial';
+const toFeet=m=>m*3.280839895, toMiles=m=>m/1609.344;
+function elevationText(m){return unitMode==='imperial'
+  ? Math.round(toFeet(m)).toLocaleString()+' ft'
+  : Math.round(m).toLocaleString()+' m';}
+function distanceText(m){
+  if(unitMode!=='imperial')return niceDistance(m);
+  if(m>=804.672)return toMiles(m).toFixed(m>=16093.44?0:1)+' mi';
+  return Math.round(toFeet(m)).toLocaleString()+' ft';
+}
+function trailLengthText(m){return unitMode==='imperial'
+  ? (toMiles(m)<.1?toMiles(m).toFixed(2):toMiles(m).toFixed(1))+' mi'
+  : trailDistanceText(m);}
+function windSpeedText(s){return (unitMode==='imperial'?s*2.236936292:s).toFixed(1);}
+function formatClock(ms){return new Intl.DateTimeFormat('en-US',
+  {timeZone:'America/New_York',hour:'numeric',minute:'2-digit'}).format(new Date(ms));}
+function updateFreshness(){
+  const el=$('last-updated');
+  if(!lastWindSuccessAt){el.textContent='No wind forecast loaded';return;}
+  const age=Date.now()-lastWindSuccessAt;
+  const next=Math.max(0,Math.ceil((REFRESH_INTERVAL_MS-(Date.now()-lastWindAttemptAt))/60000));
+  el.textContent=`Fetched ${formatClock(lastWindSuccessAt)} ET · ${age>REFRESH_INTERVAL_MS*1.5?'STALE · ':''}refresh ${next?'in '+next+' min':'due'}`;
+}
+function updateSelectedTrailStats(){
+  if(!selectedTrail||!terrain)return;
+  $('trail-distance').textContent=trailLengthText(selectedTrail.distance);
+  const profile=trailProfile(selectedTrail,terrain);
+  $('trail-gain').textContent='~'+elevationText(profile.gain);
+  $('trail-elevation').textContent=elevationText(profile.min)+' – '+elevationText(profile.max);
+}
+function updateUnitDisplays(){
+  if(world){$('extent-width').textContent=distanceText(world.width);$('extent-depth').textContent=distanceText(world.depth);}
+  for(const el of contourEls)el.textContent=elevationText(Number(el.dataset.elevation));
+  $('wind-unit-mean').textContent=unitMode==='imperial'?'mph':'m/s';
+  $('wind-unit-max').textContent=unitMode==='imperial'?'mph':'m/s';
+  const numbers=unitMode==='imperial'?['0','7','16','27','45+ mph']:['0','3','7','12','20+ m/s'];
+  [...$('wind-legend').children].forEach((el,i)=>el.textContent=numbers[i]);
+  for(const button of document.querySelectorAll('[data-height]'))button.textContent=
+    unitMode==='imperial'?Math.round(Number(button.dataset.height)*3.28084)+' ft':button.dataset.height+' m';
+  if(weather&&wind)updateTimeUI();
+  if(selectedTrail&&terrain)updateSelectedTrailStats();
+  if(terrain){updateScale();updateContourLabels();}
+  renderTrailSearch();
+}
+$('units').addEventListener('change',()=>{unitMode=$('units').value;updateUnitDisplays();});
 let selected = null, peakEls = [], trailheadEls=[];
 let lastScaleUpdate = 0, lastMarkerUpdate=0;
 
@@ -247,8 +294,9 @@ async function buildRegion() {
   releaseObjects();
   regionKey=$('region').value;
   world=boundsToWorld(REGIONS[regionKey]);
-  $('extent-width').textContent=niceDistance(world.width);
-  $('extent-depth').textContent=niceDistance(world.depth);
+  $('extent-width').textContent=distanceText(world.width);
+  $('extent-depth').textContent=distanceText(world.depth);
+  lastWindAttemptAt=Date.now();updateFreshness();
   setStatus('LOADING ELEVATION','loading');
   setLoading('Retrieving elevation tiles…');
   scene.fog = new THREE.FogExp2('#0b171c', 0.16/Math.max(world.width,world.depth));
@@ -274,7 +322,7 @@ async function buildRegion() {
     scene.add(terrain.mesh, terrain.contours);
     terrain.setVerticalScale(exaggeration);
     terrain.contours.visible=$('contours').checked;
-    peakData=SUMMITS;makePeaks();makeContourLabels();
+    peakData=SUMMITS;makePeaks();makeContourLabels();updateUnitDisplays();
     resetView();
     imageryPromise.then(outcome=>{
       if(serial!==rebuildSerial||!terrain){outcome.value?.dispose();return;}
@@ -338,6 +386,7 @@ async function refineWind(regionSerial,windToken,signal){
 function initializeWind(data) {
   if(wind){scene.remove(wind.group);wind.dispose();wind=null;}
   weather=data;
+  lastWindSuccessAt=Date.now();updateFreshness();
   const now=Date.now();
   frameIndex=Math.max(0,data.times.reduce((best,t,i)=>
     Math.abs(Date.parse(t+'Z')-now)<Math.abs(Date.parse(data.times[best]+'Z')-now)?i:best,0));
@@ -371,8 +420,8 @@ function updateTimeUI() {
   wind.updateFrame(frameIndex);
   $('time').value=String(frameIndex);
   $('forecast-time').textContent=formatTime(weather.times[frameIndex]);
-  $('mean-speed').textContent=wind.statistics.mean.toFixed(1);
-  $('max-speed').textContent=wind.statistics.max.toFixed(1);
+  $('mean-speed').textContent=windSpeedText(wind.statistics.mean);
+  $('max-speed').textContent=windSpeedText(wind.statistics.max);
   updateInspection();
 }
 function applyWindStyle() {
@@ -508,7 +557,8 @@ function makeContourLabels(){
   for(let i=0;i<source.length;i+=stride){
     const label=source[i];
     const el=document.createElement('div');el.className='contour-label';
-    el.textContent=`${label.elevation} m`;
+    el.textContent=elevationText(label.elevation);
+    el.dataset.elevation=String(label.elevation);
     el.dataset.x=String(label.x);el.dataset.z=String(label.z);
     host.append(el);contourEls.push(el);
   }
@@ -563,11 +613,11 @@ function updateInspection() {
   $('inspect-name').textContent=selected.name||'Terrain sample';
   $('inspect-lat').textContent=`${coords.lat.toFixed(5)}° N`;
   $('inspect-lon').textContent=`${Math.abs(coords.lon).toFixed(5)}° W`;
-  $('inspect-elev').textContent=`${Math.round(terrain.heightAt(x,z)).toLocaleString()} m`;
+  $('inspect-elev').textContent=elevationText(terrain.heightAt(x,z));
   if(!wind){$('inspect-wind').textContent='Unavailable';return;}
   const v=wind.fieldAt(x,z);
   const from=(Math.atan2(-v.u,v.v)*180/Math.PI+360)%360;
-  $('inspect-wind').textContent=v.missing?'Unavailable':`${v.speed.toFixed(1)} m/s · FROM ${compassFrom(from)}`;
+  $('inspect-wind').textContent=v.missing?'Unavailable':`${windSpeedText(v.speed)} ${unitMode==='imperial'?'mph':'m/s'} · from ${compassFrom(from)}`;
 }
 function updateCompass() {
   if(!terrain)return;
@@ -600,7 +650,7 @@ function updateScale() {
   const choices=[1,2,5,10].map(v=>v*order);
   const nearest=choices.reduce((best,c)=>Math.abs(c-span)<Math.abs(best-span)?c:best,choices[0]);
   $('scale-line').style.width=`${Math.max(50,Math.min(250,(2*pixelSpan)*nearest/span))}px`;
-  $('scale-text').textContent=niceDistance(nearest)+' · approximate at center';
+  $('scale-text').textContent=distanceText(nearest)+' · at map center';
 }
 let prevTime=performance.now();
 function animate(now) {
@@ -653,7 +703,7 @@ function renderTrailSearch() {
     button.classList.toggle('selected',selectedTrail?.id===rec.id);
     const blaze=document.createElement('i');blaze.className=`blaze ${rec.marker}`;blaze.setAttribute('aria-label',`${rec.marker} marker`);
     const name=document.createElement('span');name.className='trail-result-name';name.textContent=rec.name;
-    const distance=document.createElement('span');distance.className='trail-result-distance';distance.textContent=trailDistanceText(rec.distance);
+    const distance=document.createElement('span');distance.className='trail-result-distance';distance.textContent=trailLengthText(rec.distance);
     button.append(blaze,name,distance);
     button.addEventListener('click',()=>chooseTrail(rec,true));
     list.append(button);
@@ -668,10 +718,7 @@ function chooseTrail(rec,focus=false){
   trailLayer?.selectTrail(rec);
   $('trail-card').hidden=false;
   $('trail-name').textContent=rec.name;
-  $('trail-distance').textContent=trailDistanceText(rec.distance);
-  const profile=trailProfile(rec,terrain);
-  $('trail-gain').textContent=`~${Math.round(profile.gain/10)*10} m`;
-  $('trail-elevation').textContent=`${Math.round(profile.min)}–${Math.round(profile.max)} m`;
+  updateSelectedTrailStats();
   renderTrailSearch();
   if(focus)focusOnTrail(rec);
   if(mobileQuery.matches)setMobileControls(false);
