@@ -1,0 +1,11 @@
+{
+  "name": "adirondack-wind-atlas",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8000",
+    "check": "node --check src/geo.js && node --check src/terrain.js && node --check src/imagery.js && node --check src/peaks.js && node --check src/wind.js && node --check src/trails.js && node --check src/trail-visual.js && node --check src/main.js",
+    "test": "node tests/check.mjs && node tests/trails.mjs && npm run check"
+  }
+}
