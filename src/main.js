@@ -36,12 +36,34 @@ if (mobileQuery.matches) $('quality').value = 'high';
 $('wind-style').value = 'streamlines';
 const toggleControls = $('toggle-controls');
 const controlsPanel = $('controls-panel');
+let activeTab='map';
 function setMobileControls(open) {
   controlsPanel.classList.toggle('is-open',open);
   toggleControls.setAttribute('aria-expanded',String(open));
   toggleControls.setAttribute('aria-label',open?'Close map controls':'Open map controls');
   toggleControls.innerHTML = open ? 'CLOSE <span aria-hidden="true">×</span>' : 'CONTROLS <span aria-hidden="true">☰</span>';
+  document.querySelectorAll('[data-dock]').forEach(button=>{
+    const chosen=open&&button.dataset.dock===activeTab;
+    button.classList.toggle('active',chosen);
+    button.setAttribute('aria-pressed',String(chosen));
+  });
 }
+function selectTab(tab,open=true){
+  activeTab=tab;
+  document.querySelectorAll('[data-panel]').forEach(el=>el.hidden=el.dataset.panel!==tab);
+  document.querySelectorAll('.panel-tabs [data-tab]').forEach(button=>{
+    const chosen=button.dataset.tab===tab;
+    button.classList.toggle('active',chosen);
+    button.setAttribute('aria-selected',String(chosen));
+  });
+  if(mobileQuery.matches)setMobileControls(open);
+}
+for(const button of document.querySelectorAll('.panel-tabs [data-tab]'))
+  button.addEventListener('click',()=>selectTab(button.dataset.tab));
+for(const button of document.querySelectorAll('[data-dock]'))
+  button.addEventListener('click',()=>selectTab(button.dataset.dock,
+    !(activeTab===button.dataset.dock&&controlsPanel.classList.contains('is-open'))));
+selectTab('map',false);
 toggleControls.addEventListener('click',()=>setMobileControls(!controlsPanel.classList.contains('is-open')));
 window.addEventListener('keydown',event=>{if(event.key==='Escape')setMobileControls(false);});
 mobileQuery.addEventListener('change',()=>setMobileControls(false));
@@ -104,6 +126,16 @@ function setOverhead(next){
   updateScale();
 }
 $('toggle-2d').addEventListener('click',()=>setOverhead(!overhead));
+$('compass-reset').addEventListener('click',()=>{
+  if(!terrain)return;
+  if(!overhead){
+    const offset=camera.position.clone().sub(controls.target);
+    const radius=Math.max(25,Math.hypot(offset.x,offset.z));
+    camera.position.set(controls.target.x,controls.target.y+offset.y,controls.target.z+radius);
+  }else camera.up.set(0,0,-1);
+  camera.lookAt(controls.target);controls.update();
+  updateCompass();updatePeaks();updateContourLabels();
+});
 function adjustZoom(factor){
   if(!terrain)return;
   if(overhead){
@@ -544,7 +576,7 @@ function updateCompass() {
   const base=new THREE.Vector3(0,level,0).project(camera);
   const north=new THREE.Vector3(0,level,-length).project(camera);
   const angle=Math.atan2(north.x-base.x,north.y-base.y)*180/Math.PI;
-  if(Number.isFinite(angle))document.querySelector('.north-icon').style.transform=`rotate(${angle}deg)`;
+  if(Number.isFinite(angle))$('compass-arrow').style.transform=`rotate(${angle}deg)`;
 }
 function updateScale() {
   if(!terrain)return;
@@ -663,6 +695,7 @@ $('close-trail').addEventListener('click',()=>{
   $('trail-card').hidden=true;renderTrailSearch();
 });
 $('quick-trails').addEventListener('click',()=>{
+  selectTab('trails');
   setMobileControls(true);
   $('trail-section').scrollIntoView({block:'start',behavior:'smooth'});
   $('trail-search').focus({preventScroll:true});
@@ -715,7 +748,7 @@ function showLocation(lat,lon,accuracy){
 $('locate').addEventListener('click',()=>{
   const status=$('location-status');status.hidden=false;
   if(!navigator.geolocation){status.textContent='This browser does not support GPS location.';return;}
-  if(!window.isSecureContext){status.textContent='GPS requires HTTPS. Publish to Netlify for location support on iPhone.';return;}
+  if(!window.isSecureContext){status.textContent='GPS requires HTTPS. Open the published GitHub Pages site.';return;}
   status.textContent='Requesting one-time device location…';
   navigator.geolocation.getCurrentPosition(
     position=>{if(!terrain){status.textContent='Terrain is still loading.';return;}
