@@ -446,6 +446,9 @@ $('reload-data').addEventListener('click',()=>{
   refreshWeather();
 });
 async function refreshWeather(){
+  if(windRefreshInProgress)return;
+  windRefreshInProgress=true;
+  lastWindAttemptAt=Date.now();updateFreshness();
   const regionSerial=rebuildSerial;
   const token=++windRefreshSerial;
   windAbort?.abort();windAbort=new AbortController();
@@ -461,8 +464,20 @@ async function refreshWeather(){
     if(regionSerial!==rebuildSerial||token!==windRefreshSerial)return;
     setStatus(wind?'FORECAST STALE · REFRESH FAILED':'WIND UNAVAILABLE','error');
     $('model-tag').textContent=errorText(error);
+  }finally {
+    windRefreshInProgress=false;updateFreshness();
   }
 }
+setInterval(()=>{
+  updateFreshness();
+  if(!document.hidden&&terrain&&lastWindAttemptAt&&
+     Date.now()-lastWindAttemptAt>=REFRESH_INTERVAL_MS&&!windRefreshInProgress)refreshWeather();
+},60_000);
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&terrain&&lastWindAttemptAt&&
+     Date.now()-lastWindAttemptAt>=REFRESH_INTERVAL_MS&&!windRefreshInProgress)refreshWeather();
+  updateFreshness();
+});
 $('wind-style').addEventListener('change',applyWindStyle);
 $('wind-width').addEventListener('input',()=>{
   $('wind-width-label').textContent=`${Number($('wind-width').value).toFixed(1)} px`;
@@ -491,6 +506,7 @@ $('animation').addEventListener('input',()=>{
 });
 $('contours').addEventListener('change',()=>{if(terrain)terrain.contours.visible=$('contours').checked;updateContourLabels();});
 $('peaks').addEventListener('change',()=>updatePeaks());
+$('label-density').addEventListener('change',updatePeaks);
 $('show-trails').addEventListener('change',()=>trailLayer?.setVisible($('show-trails').checked));
 $('trail-search').addEventListener('input',renderTrailSearch);
 $('show-trailheads').addEventListener('change',updateTrailheads);
@@ -531,6 +547,8 @@ function updatePeaks(){
   const rect=host.getBoundingClientRect();
   const shown=[];
   const candidates=[];
+  const labelMode=$('label-density').value;
+  const maxNames=labelMode==='all'?150:labelMode==='more'?(mobileQuery.matches?38:100):(mobileQuery.matches?16:32);
   for(const el of peakEls){
     const x=Number(el.dataset.x),z=Number(el.dataset.z);
     const p=new THREE.Vector3(x,terrain.heightAt(x,z)*exaggeration+45,z).project(camera);
@@ -544,7 +562,8 @@ function updatePeaks(){
     // Actual labels are compact. Cull overlapping TEXT, not whole 100 px cells.
     const textWidth=Math.min(140,15+c.el.textContent.length*5.7);
     const r={l:c.sx-5,t:c.sy-10,r:c.sx+textWidth,b:c.sy+10};
-    if(shown.some(q=>r.l<q.r+3&&r.r>q.l-3&&r.t<q.b+2&&r.b>q.t-2))continue;
+    if(shown.length>=maxNames)break;
+    if(labelMode!=='all'&&shown.some(q=>r.l<q.r+(labelMode==='more'?0:5)&&r.r>q.l-(labelMode==='more'?0:5)&&r.t<q.b+1&&r.b>q.t-1))continue;
     shown.push(r);c.el.hidden=false;
     c.el.style.left=`${c.sx}px`;c.el.style.top=`${c.sy}px`;
   }
