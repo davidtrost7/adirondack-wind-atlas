@@ -1,5 +1,20 @@
 # Adirondack Wind Atlas — Terrain, Satellite, Trails & Wind (v3)
 
+## Publish using GitHub Pages (no downloads or separate hosting account)
+
+This repository can be served as a static website directly from GitHub. On GitHub Free,
+**the repository must be public** to use GitHub Pages. Changing it from private to public
+exposes the source files, not just the website.
+
+1. In repository **Settings → General → Danger Zone**, change repository visibility to **Public** if you use GitHub Free.
+2. Go to **Settings → Pages**.
+3. Under **Build and deployment**, choose **Deploy from a branch**.
+4. Choose **main** and **/(root)**, then **Save**.
+5. Once GitHub Pages finishes publishing, open **https://davidtrost7.github.io/adirondack-wind-atlas/** in Safari. Visitors do not need a GitHub account.
+
+No npm install, compilation, API key, or ZIP transfer is required. Updates to `main` publish through GitHub Pages once configured.
+
+
 An interactive, geographically scaled **3D / overhead Adirondack terrain map** with official NYS Department of Environmental Conservation hiking trails, mapped trailheads, Esri aerial imagery, numbered elevation contours, animated wind flow lines (10 m and 80 m), search, approximate DEM-derived trail elevation profiles, and GPX export.
 
 **Runs in iPhone Safari or desktop browsers** as a static website. No API key, no build pipeline, no paid map service. Requires a live internet connection for external scripts and data.
