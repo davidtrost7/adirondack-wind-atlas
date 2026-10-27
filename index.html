@@ -10,6 +10,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>Adirondack Wind Atlas — 3D Terrain &amp; Forecast Wind</title>
   <link rel="stylesheet" href="./src/style.css" />
+  <link rel="stylesheet" href="./src/ux.css" />
   <script type="importmap">
   {
     "imports": {
@@ -23,13 +24,14 @@
   <main id="app">
     <div class="viewport" id="viewport" aria-label="Interactive three-dimensional Adirondack terrain"><div id="canvas-host"></div></div>
     <div class="top-left surface">
-      <div class="eyebrow"><span class="signal"></span> TERRAIN LABORATORY <span class="edition">01 / ADIRONDACKS</span></div>
-      <h1>Adirondack <em>Wind Atlas</em></h1>
-      <div class="subhead">Satellite imagery. Numbered contours. DEC trails. Animated forecast winds.</div>
+      <div class="eyebrow"><span class="signal"></span> ADIRONDACKS · 3D TERRAIN</div>
+      <h1>Wind <em>Atlas</em></h1>
+      <div class="subhead">Terrain · trails · weather forecasts</div>
     </div>
     <div class="top-right surface">
       <div class="status-row"><span id="status-indicator" class="dot loading"></span><span id="status">INITIALIZING MAP</span></div>
       <div id="model-tag" class="model-tag">AWAITING FORECAST</div>
+      <div id="last-updated" class="freshness" role="status" aria-live="polite">Forecast not loaded</div>
     </div>
     <button id="toggle-controls" class="mobile-panel-toggle" type="button" aria-controls="controls-panel" aria-expanded="false" aria-label="Open map controls">CONTROLS <span aria-hidden="true">☰</span></button>
     <div class="map-tools surface" aria-label="Map shortcuts">
@@ -37,14 +39,16 @@
       <button id="toggle-2d" title="Switch between 3D and overhead map">2D VIEW</button>
       <button id="locate" title="Locate using your device’s GPS">◎ LOCATE</button>
     </div>
-    <div class="zoom-tools surface" aria-label="Map zoom">
+    <div class="zoom-tools surface" aria-label="Map orientation and zoom">
+      <button id="compass-reset" type="button" aria-label="Rotate map to north" title="Tap to face north"><span id="compass-arrow">▲</span><span class="compass-n">N</span></button>
       <button id="zoom-in" type="button" aria-label="Zoom in on the current focus">+</button>
       <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
     </div>
     <div class="satellite-attribution">Imagery © Esri, Maxar, Earthstar Geographics, GIS User Community</div>
     <div class="location-status" id="location-status" hidden aria-live="polite"></div>
     <aside id="controls-panel" class="panel" aria-label="Map controls">
-      <section class="control-section">
+      <nav class="panel-tabs" aria-label="Settings categories"><button data-tab="map" class="active" type="button">Map</button><button data-tab="trails" type="button">Trails</button><button data-tab="wind" type="button">Wind</button><button data-tab="display" type="button">Display</button></nav>
+      <section class="control-section" data-panel="map">
         <div class="section-head"><span>01</span> TERRITORY</div>
         <label class="field-label" for="region">GEOGRAPHIC EXTENT</label>
         <select id="region">
@@ -57,12 +61,13 @@
         <div class="metric-pair"><div><span>WIDTH</span><strong id="extent-width">—</strong></div><div><span>LENGTH</span><strong id="extent-depth">—</strong></div></div>
         <label class="field-label" for="quality">TERRAIN DETAIL</label>
         <select id="quality"><option value="ultra">Ultra · focused high resolution</option><option value="high">High · detailed mesh</option><option value="standard">Standard · faster</option></select>
-      </section>
-      <section class="control-section" id="trail-section">
-        <div class="section-head"><span>02</span> DEC HIKING TRAILS</div>
         <label class="field-label" for="basemap">GROUND SURFACE</label>
         <select id="basemap"><option value="hybrid" selected>Satellite + relief shading</option><option value="satellite">Satellite imagery</option><option value="relief">Elevation colors</option></select>
         <div class="trail-count" id="imagery-status">Loading satellite imagery…</div>
+
+      </section>
+      <section class="control-section" id="trail-section" data-panel="trails">
+        <div class="section-head"><span>02</span> DEC HIKING TRAILS</div>
         <label class="toggle"><input type="checkbox" id="show-trails" checked /><span class="check"></span>Show official mapped trails</label>
         <div class="trail-legend"><span><i class="blaze blue"></i>BLUE</span><span><i class="blaze red"></i>RED</span><span><i class="blaze yellow"></i>YELLOW</span><span><i class="blaze unmarked"></i>OTHER</span></div>
         <div class="trail-count" id="trail-count" aria-live="polite">Awaiting trail data…</div>
@@ -72,8 +77,8 @@
         <div id="trail-results" class="trail-results" role="list" aria-label="Matching DEC trails"></div>
         <p class="note">Segments are not complete suggested hikes. DEC GIS does not provide real-time closures. Confirm access, conditions and route independently.</p>
       </section>
-      <section class="control-section">
-        <div class="section-head"><span>03</span> WIND FIELD</div>
+      <section class="control-section" data-panel="wind">
+        <div class="section-head"><span>03</span> WIND FORECAST</div>
         <label class="field-label" for="height">HEIGHT ABOVE GROUND</label>
         <div class="segmented" id="height-segment" role="group" aria-label="Wind height"><button data-height="10" class="active">10 m</button><button data-height="80">80 m</button></div>
         <label class="field-label" for="wind-style">VISUALIZATION</label>
@@ -82,27 +87,29 @@
         <input id="wind-width" type="range" min="1.5" max="9" value="4.5" step="0.5" />
         <div class="slider-title"><label class="field-label" for="wind-density">FLOW LINE DENSITY</label><span id="wind-density-label">150 paths</span></div>
         <input id="wind-density" type="range" min="40" max="300" value="150" step="10" />
-        <div class="wind-stats"><div class="big-metric"><span>MEAN MODEL WIND</span><div><strong id="mean-speed">—</strong><small>m/s</small></div></div><div class="big-metric"><span>GRID MAXIMUM</span><div><strong id="max-speed">—</strong><small>m/s</small></div></div></div>
-        <div class="legend"><div class="legend-colors"></div><div class="legend-numbers"><span>0</span><span>3</span><span>7</span><span>12</span><span>20+ m/s</span></div></div>
+        <div class="wind-stats"><div class="big-metric"><span>MEAN MODEL WIND</span><div><strong id="mean-speed">—</strong><small id="wind-unit-mean">mph</small></div></div><div class="big-metric"><span>GRID MAXIMUM</span><div><strong id="max-speed">—</strong><small id="wind-unit-max">mph</small></div></div></div>
+        <div class="legend"><div class="legend-colors"></div><div class="legend-numbers" id="wind-legend"><span>0</span><span>7</span><span>16</span><span>27</span><span>45+ mph</span></div></div>
         <div class="note" id="wind-disclaimer">Forecast vectors are interpolated between sampled model points; fine terrain detail is not fine-scale wind resolution.</div>
       </section>
-      <section class="control-section">
-        <div class="section-head"><span>04</span> PRESENTATION</div>
+      <section class="control-section" data-panel="display">
+        <div class="section-head"><span>04</span> DISPLAY & UNITS</div>
+        <label class="field-label" for="units">MEASUREMENTS</label><select id="units"><option value="imperial" selected>US · feet, miles, mph</option><option value="metric">Metric · metres, km, m/s</option></select>
+        <label class="field-label" for="label-density">MOUNTAIN LABELS</label><select id="label-density"><option value="standard">Readable</option><option value="more" selected>More names</option><option value="all">Maximum</option></select>
         <div class="slider-title"><label class="field-label" for="vertical">VERTICAL SCALE</label><span id="vertical-label">1.00× · TRUE SCALE</span></div>
         <input type="range" id="vertical" min="1" max="5" step="0.25" value="1" />
         <div class="slider-title"><label class="field-label" for="animation">FLOW TIME COMPRESSION</label><span id="animation-label">80×</span></div>
         <input type="range" id="animation" min="10" max="350" step="10" value="80" />
-        <label class="toggle"><input type="checkbox" id="contours" checked /><span class="check"></span>Numbered elevation contours (metres)</label>
+        <label class="toggle"><input type="checkbox" id="contours" checked /><span class="check"></span>Numbered elevation contours</label>
         <label class="toggle"><input type="checkbox" id="peaks" checked /><span class="check"></span>Summit labels</label><div class="trail-count" id="peak-status">Loading named summits…</div>
       </section>
-      <div class="panel-bottom"><button id="reset-view" class="secondary-btn">↗ &nbsp; RESET VIEW</button><button id="reload-data" class="secondary-btn">⟳ &nbsp; REFRESH DATA</button></div>
+      <div class="panel-bottom"><button id="reset-view" class="secondary-btn">↗ &nbsp; RESET VIEW</button><button id="reload-data" class="secondary-btn">⟳ &nbsp; REFRESH WIND</button></div>
     </aside>
     <div class="time-panel surface">
-      <div class="timeline-head"><div><span class="micro">FORECAST TIME · EASTERN</span><strong id="forecast-time">—</strong></div><button id="play" class="play-btn" aria-label="Pause forecast playback">Ⅱ</button></div>
+      <div class="timeline-head"><div><span class="micro">FORECAST TIME · EASTERN</span><strong id="forecast-time">—</strong></div><button id="play" class="play-btn" aria-label="Play forecast playback">▶</button></div>
       <input type="range" id="time" min="0" max="18" value="0" step="1" disabled />
       <div class="time-ends"><span id="time-start">—</span><span id="time-end">—</span></div>
     </div>
-    <div class="hud-left surface"><div class="north-icon"><span>N</span><svg width="40" height="46" viewBox="0 0 40 46"><path d="M20 5 L27 36 L20 29 L13 36 Z" fill="#d6e5df" stroke="#6e8e91" stroke-width="1"/></svg></div><div class="hud-hint"><span class="desktop-gesture">DRAG TO ORBIT<br/>SCROLL TO ZOOM<br/>SHIFT + DRAG TO PAN<br/>CLICK TO INSPECT</span><span class="mobile-gesture">ONE FINGER · ORBIT<br/>TWO FINGERS · ZOOM/PAN<br/>TAP · INSPECT</span></div></div>
+    <div class="hud-left surface"><div class="hud-hint"><span class="desktop-gesture">DRAG TO ORBIT<br/>SCROLL TO ZOOM<br/>SHIFT + DRAG TO PAN<br/>CLICK TO INSPECT</span><span class="mobile-gesture">ONE FINGER · ORBIT<br/>TWO FINGERS · ZOOM/PAN<br/>TAP · INSPECT</span></div></div>
     <div class="hud-right surface"><div class="scale-label">GROUND SCALE · UTM 18N</div><div id="scale-line" class="scale-line"></div><div id="scale-text" class="scale-text">—</div><div class="projection">EPSG:32618 · VERTICAL 1.00×</div></div>
     <div class="trail-card surface" id="trail-card" hidden>
       <button class="trail-card-close" id="close-trail" aria-label="Close trail details">×</button>
@@ -113,8 +120,9 @@
       <p>Visible mapped segment only. Elevation estimates come from the DEM; not a route plan. Check current DEC notices before hiking.</p>
     </div>
     <div class="inspect" id="inspect" hidden><button id="close-inspect" aria-label="Close details">×</button><div class="micro">INSPECTED LOCATION</div><strong id="inspect-name">Terrain sample</strong><div class="inspect-grid"><div><span>LATITUDE</span><b id="inspect-lat">—</b></div><div><span>LONGITUDE</span><b id="inspect-lon">—</b></div><div><span>DEM ELEVATION</span><b id="inspect-elev">—</b></div><div><span>FORECAST WIND</span><b id="inspect-wind">—</b></div></div></div>
+    <nav class="mobile-dock surface" aria-label="Map tools"><button type="button" data-dock="map">Map</button><button type="button" data-dock="trails">Trails</button><button type="button" data-dock="wind">Wind</button><button type="button" data-dock="display">Display</button></nav>
     <div id="loading-overlay" class="loading-overlay"><div class="loading-card"><div class="loading-orbit"></div><span class="micro">BUILDING GEOGRAPHIC SCENE</span><strong id="loading-detail">Locating DEM tiles…</strong><div class="loading-caption">Terrain and forecast data load from public services.</div></div></div>
-    <footer class="credits">TRAILS <a href="https://gisservices.dec.ny.gov/arcgis/rest/services/dil/dil_trails/MapServer/2" target="_blank" rel="noopener">NYS DEC</a> · ELEVATION <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">MAPZEN / AWS</a> · WIND <a href="https://open-meteo.com/en/docs/gfs-api" target="_blank" rel="noopener">OPEN-METEO / NOAA</a> · METRIC PROJECTION UTM 18N</footer>
+    <footer class="credits">TRAILS <a href="https://gisservices.dec.ny.gov/arcgis/rest/services/dil/dil_trails/MapServer/2" target="_blank" rel="noopener">NYS DEC</a> · ELEVATION <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">MAPZEN / AWS</a> · WIND <a href="https://open-meteo.com/en/docs/gfs-api" target="_blank" rel="noopener">OPEN-METEO / NOAA</a> · GEOMETRY UTM 18N</footer>
   </main>
   <script type="module" src="./src/main.js"></script>
 </body>
