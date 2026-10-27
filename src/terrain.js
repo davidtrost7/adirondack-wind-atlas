@@ -161,7 +161,10 @@ export async function createTerrain(world, { quality = 'high', mobile=false, sig
     vertexColors:true, roughness:1, metalness:0, side:THREE.DoubleSide,
   }));
   mesh.receiveShadow = true;
-  const contourData = buildContours(nx, nz, heights, world, world.width > 125000 ? 200 : world.width < 28000 ? 50 : 100);
+  // Contour elevations use exact 200/400/1000-foot intervals at increasing extents.
+  // Underlying DEM values and every vertex remain in actual metres.
+  const contourFeet=world.width > 125000 ? 1000 : world.width < 28000 ? 200 : 400;
+  const contourData = buildContours(nx, nz, heights, world, contourFeet / 3.280839895);
   const contour = contourData.geometry;
   const contours = new THREE.LineSegments(contour, new THREE.LineBasicMaterial({
     color:0x142f31, transparent:true, opacity:0.40, depthWrite:false,
@@ -216,7 +219,7 @@ function buildContours(nx, nz, h, w, step) {
       if (p.length === 4) verts.push(...p[0],...p[1],...p[2],...p[3]);
       // Label index contours in metres; candidate positions later undergo
       // screen-space collision checks and camera-frustum culling.
-      if(p.length>=2 && level % (step*2)===0) {
+      if(p.length>=2 && Math.round(level/step)%2===0) {
         const mx=(p[0][0]+p[1][0])/2,mz=(p[0][2]+p[1][2])/2;
         const bx=Math.floor((mx+w.width/2)/spacing),bz=Math.floor((mz+w.depth/2)/spacing);
         const key=`${level}:${bx}:${bz}`;
