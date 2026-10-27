@@ -334,7 +334,9 @@ async function buildRegion() {
       if(serial!==rebuildSerial||!terrain)return;
       if(outcome.value?.peaks?.length){peakData=outcome.value.peaks;makePeaks();
         $('peak-status').textContent=`${peakData.length} named OSM summits in extent`;}
-      else $('peak-status').textContent='Offline fallback · limited summit names';
+      else $('peak-status').textContent=outcome.value?.limited
+        ? 'Regional map: choose a closer area to load more summit names'
+        : 'Summit service unavailable · showing a limited local fallback';
     });
     $('model-tag').textContent=`DEM z${terrain.demZoom} · ${terrain.nx}×${terrain.nz} GRID`;
     trailheadsPromise.then(outcome=>{if(serial===rebuildSerial&&terrain&&outcome.value)makeTrailheads(outcome.value);});
