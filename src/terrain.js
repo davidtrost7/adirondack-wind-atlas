@@ -85,19 +85,27 @@ function colorAt(height, out) {
 }
 
 // All mesh vertices are spaced in true UTM metres. Elevation is metres above sea level.
-export async function createTerrain(world, { quality = 'high', mobile=false, signal, onProgress } = {}) {
+export async function createTerrain(world, { quality = 'high', mobile=false, detailRegion=false, signal, onProgress } = {}) {
   // Higher DEM zooms only improve a LOCAL view; cap tile count on mobile devices.
   // Terrain samples are sourced elevations, not newly invented sub-pixel detail.
-  const tileBudget = quality==='ultra' ? 98 : quality==='high' ? 85 : 62;
-  let z = quality==='ultra' ? 14 : quality==='high' ? 13 : 11;
+  // The optional all-46 detail extent maintains Marcy-close-up DEM z13 over
+  // a much larger footprint (~240 tiles versus ~81). Other extents retain
+  // conservative budgets. Standard quality is the low-bandwidth escape hatch.
+  const fullDetail = detailRegion && quality!=='standard';
+  const tileBudget = fullDetail ? 270 : quality==='ultra' ? 98 : quality==='high' ? 85 : 62;
+  let z = fullDetail ? 13 : quality==='ultra' ? 14 : quality==='high' ? 13 : 11;
   const tileCount=level=>{
     const a=Math.floor(toTileX(world.west,level))-1,b=Math.floor(toTileX(world.east,level))+1;
     const c=Math.floor(toTileY(world.north,level))-1,d=Math.floor(toTileY(world.south,level))+1;
     return (b-a+1)*(d-c+1);
   };
   while(z>7&&tileCount(z)>tileBudget)z--;
-  const density=mobile ? (quality==='ultra'?485:quality==='high'?390:245) : (quality==='ultra'?580:quality==='high'?465:285);
-  const limit=mobile ? (quality==='ultra'?490:quality==='high'?395:250) : (quality==='ultra'?590:quality==='high'?475:300);
+  const density=fullDetail
+    ? (mobile?(quality==='ultra'?680:620):(quality==='ultra'?880:800))
+    : mobile ? (quality==='ultra'?485:quality==='high'?390:245) : (quality==='ultra'?580:quality==='high'?465:285);
+  const limit=fullDetail
+    ? (mobile?(quality==='ultra'?690:630):(quality==='ultra'?890:810))
+    : mobile ? (quality==='ultra'?490:quality==='high'?395:250) : (quality==='ultra'?590:quality==='high'?475:300);
   const nx=Math.max(90,Math.min(limit,Math.round(density*world.width/Math.max(world.width,world.depth))));
   const nz=Math.max(90,Math.min(limit,Math.round(density*world.depth/Math.max(world.width,world.depth))));
   const tx0 = Math.floor(toTileX(world.west, z)) - 1;
@@ -217,13 +225,13 @@ function buildContours(nx, nz, h, w, step) {
         crossing(d,c,x1,z1,x0,z1,level), crossing(c,a,x0,z1,x0,z0,level)].filter(Boolean);
       if (p.length === 2) verts.push(...p[0], ...p[1]);
       if (p.length === 4) verts.push(...p[0],...p[1],...p[2],...p[3]);
-      // Label index contours in metres; candidate positions later undergo
-      // screen-space collision checks and camera-frustum culling.
-      if(p.length>=2 && Math.round(level/step)%2===0) {
+      // Candidate label on each contour level; rotate along this segment
+      // after projecting its tangent into the user's camera view.
+      if(p.length>=2) {
         const mx=(p[0][0]+p[1][0])/2,mz=(p[0][2]+p[1][2])/2;
         const bx=Math.floor((mx+w.width/2)/spacing),bz=Math.floor((mz+w.depth/2)/spacing);
         const key=`${level}:${bx}:${bz}`;
-        if(!occupied.has(key)) {occupied.add(key);labels.push({x:mx,z:mz,elevation:level});}
+        if(!occupied.has(key)) {occupied.add(key);labels.push({x:mx,z:mz,elevation:level,dx:p[1][0]-p[0][0],dz:p[1][2]-p[0][2]});}
       }
     }
   }
