@@ -7,6 +7,17 @@ for(const [lat,lon] of locations){
   const p=toUTM(lat,lon), q=fromUTM(p.east,p.north);
   assert.ok(Math.abs(q.lat-lat)<1e-7 && Math.abs(q.lon-lon)<1e-7, 'WGS84/UTM round-trip failed');
 }
+import {HIGH_PEAKS,mergePeaks} from '../src/peaks.js';
+
+const all46Bounds={south:44.025,north:44.416,west:-74.255,east:-73.665};
+assert.equal(HIGH_PEAKS.length,46,'Exactly 46 traditional High Peaks must be bundled');
+assert.equal(new Set(HIGH_PEAKS.map(p=>p.name)).size,46,'High Peak names must be unique');
+assert.equal(mergePeaks(all46Bounds).length,46,'Detailed High Peaks region must contain all 46 summits');
+assert.equal(mergePeaks({south:42.92,north:45.045,west:-75.57,east:-73.255}).length,46,
+  'Park-wide map must retain all 46 offline labels');
+assert.equal(mergePeaks(all46Bounds,[{name:'Mount Marcy',lat:44.113,lon:-73.924}]).length,46,
+  'Matching OSM summits must not duplicate core names');
+
 const world=boundsToWorld({south:43.975,north:44.295,west:-74.205,east:-73.650});
 assert.ok(world.width>44000&&world.width<47000,'High Peaks width should be ~45 km');
 assert.ok(world.depth>35000&&world.depth<38000,'High Peaks length should be ~36 km');
@@ -56,4 +67,4 @@ const fallback=await fetchWind(world);
 assert.equal(fallback.N,1);
 assert.equal(fallback.uniform,true);
 assert.equal(fallback.sampled,1);
-console.log('PASS: WGS84/UTM scale, HRRR vectors, batched samples and honest single-point fallback');
+console.log('PASS: 46 High Peaks coverage, WGS84/UTM scale, HRRR vectors, batched samples and honest single-point fallback');
