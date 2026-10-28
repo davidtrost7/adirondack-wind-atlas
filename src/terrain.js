@@ -88,23 +88,26 @@ function colorAt(height, out) {
 export async function createTerrain(world, { quality = 'high', mobile=false, detailRegion=false, signal, onProgress } = {}) {
   // Higher DEM zooms only improve a LOCAL view; cap tile count on mobile devices.
   // Terrain samples are sourced elevations, not newly invented sub-pixel detail.
-  // The optional all-46 detail extent maintains Marcy-close-up DEM z13 over
-  // a much larger footprint (~240 tiles versus ~81). Other extents retain
-  // conservative budgets. Standard quality is the low-bandwidth escape hatch.
+  // Full-detail mode intentionally loads up to 810 DEM tiles at z14, rather
+  // than quietly substituting a low-resolution overview. This uses the same
+  // elevation dataset as the close-ups; Ultra increases mesh sampling further.
+  // Standard is an explicit lower-bandwidth alternative, never an automatic fallback.
   const fullDetail = detailRegion && quality!=='standard';
-  const tileBudget = fullDetail ? 270 : quality==='ultra' ? 98 : quality==='high' ? 85 : 62;
-  let z = fullDetail ? 13 : quality==='ultra' ? 14 : quality==='high' ? 13 : 11;
+  const tileBudget = fullDetail ? 850 : quality==='ultra' ? 98 : quality==='high' ? 85 : 62;
+  let z = fullDetail ? 14 : quality==='ultra' ? 14 : quality==='high' ? 13 : 11;
   const tileCount=level=>{
     const a=Math.floor(toTileX(world.west,level))-1,b=Math.floor(toTileX(world.east,level))+1;
     const c=Math.floor(toTileY(world.north,level))-1,d=Math.floor(toTileY(world.south,level))+1;
     return (b-a+1)*(d-c+1);
   };
   while(z>7&&tileCount(z)>tileBudget)z--;
+  // Match or exceed the Marcy close-up's ground metres per mesh cell even
+  // across the ~47 km full 46-peak footprint. No fake subdivision of a DEM.
   const density=fullDetail
-    ? (mobile?(quality==='ultra'?680:620):(quality==='ultra'?880:800))
+    ? (mobile?(quality==='ultra'?1120:910):(quality==='ultra'?1260:1050))
     : mobile ? (quality==='ultra'?485:quality==='high'?390:245) : (quality==='ultra'?580:quality==='high'?465:285);
   const limit=fullDetail
-    ? (mobile?(quality==='ultra'?690:630):(quality==='ultra'?890:810))
+    ? (mobile?(quality==='ultra'?1130:920):(quality==='ultra'?1270:1060))
     : mobile ? (quality==='ultra'?490:quality==='high'?395:250) : (quality==='ultra'?590:quality==='high'?475:300);
   const nx=Math.max(90,Math.min(limit,Math.round(density*world.width/Math.max(world.width,world.depth))));
   const nz=Math.max(90,Math.min(limit,Math.round(density*world.depth/Math.max(world.width,world.depth))));
