@@ -5,13 +5,17 @@ import * as THREE from 'three';
 // to DEC trails even though the map surface is in EPSG:32618.
 export const tileX = (lon,z) => (lon+180)/360*2**z;
 export const tileY = (lat,z) => (1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*2**z;
-export function imageryPlan(world,{mobile=false}={}) {
-  const maxTiles=mobile?78:110;
+export function imageryPlan(world,{mobile=false,detailRegion=false,quality='high'}={}) {
+  // The opt-in detailed High Peaks extent can load satellite tiles at the
+  // same zoom as the focused view; Standard retains the smaller mosaic.
+  const detailed=detailRegion&&quality!=='standard';
+  const maxTiles=detailed?260:(mobile?78:110);
+  const maxAxis=detailed?18:12;
   let zoom=15, x0,x1,y0,y1;
   for(;zoom>=7;zoom--) {
     x0=Math.floor(tileX(world.west,zoom));x1=Math.floor(tileX(world.east,zoom));
     y0=Math.floor(tileY(world.north,zoom));y1=Math.floor(tileY(world.south,zoom));
-    if((x1-x0+1)*(y1-y0+1)<=maxTiles && x1-x0+1<=12 && y1-y0+1<=12) break;
+    if((x1-x0+1)*(y1-y0+1)<=maxTiles && x1-x0+1<=maxAxis && y1-y0+1<=maxAxis) break;
   }
   return {zoom,x0,x1,y0,y1,width:(x1-x0+1)*256,height:(y1-y0+1)*256,
     count:(x1-x0+1)*(y1-y0+1)};
@@ -29,8 +33,8 @@ function loadImage(url,signal){
     img.src=url;
   });
 }
-export async function loadImagery(world,{mobile=false,signal,onProgress}={}){
-  const plan=imageryPlan(world,{mobile});
+export async function loadImagery(world,{mobile=false,detailRegion=false,quality='high',signal,onProgress}={}){
+  const plan=imageryPlan(world,{mobile,detailRegion,quality});
   const canvas=document.createElement('canvas');canvas.width=plan.width;canvas.height=plan.height;
   const ctx=canvas.getContext('2d',{alpha:false});
   ctx.fillStyle='#31443c';ctx.fillRect(0,0,plan.width,plan.height);
