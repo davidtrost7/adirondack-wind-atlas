@@ -97,8 +97,8 @@
   .trailhead-pin{width:24px;height:24px}
 }
 
-/* Altitude labels: quiet enough to sit over satellite imagery, legible on phone. */
-.contour-label{pointer-events:none;position:absolute;z-index:1;transform:translate(-50%,-50%);padding:2px 4px;border:1px solid #1b292a75;border-radius:2px;background:#f0edddda;color:#203634;text-shadow:none;font:600 10px/1.05 var(--mono);white-space:nowrap;box-shadow:0 1px 4px #0918186b}
+/* Topographic annotations: elevation numbers follow contour segments with no floating box. */
+.contour-label{pointer-events:none;position:absolute;z-index:1;transform:translate(-50%,-50%);padding:0 1px;border:0;background:transparent;color:#ffe6ad;text-shadow:0 1px 2px #091a1d,0 -1px 2px #091a1d,1px 0 2px #091a1d,-1px 0 2px #091a1d;font:700 10px/1 var(--mono);white-space:nowrap;box-shadow:none;transform-origin:center}
 .contour-label[hidden]{display:none!important}
 @media(max-width:700px){.contour-label{font-size:9px;padding:2px 3px}.peak-marker{font-size:9px}}
 
