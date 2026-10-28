@@ -129,7 +129,7 @@ export async function createTerrain(world, { quality = 'high', mobile=false, det
       onProgress?.(`TERRAIN · ${done}/${keys.length} TILES`);
     }
   }
-  await Promise.all(Array.from({ length: Math.min(7, keys.length) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(fullDetail?14:7, keys.length) }, () => worker()));
 
   const n = (nx + 1) * (nz + 1);
   const heights = new Float32Array(n);
