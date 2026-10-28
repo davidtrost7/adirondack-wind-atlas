@@ -572,13 +572,14 @@ function clearContourLabels(){for(const el of contourEls)el.remove();contourEls=
 function makeContourLabels(){
   clearContourLabels();
   const source=terrain?.contourLabels||[];
-  const stride=Math.max(1,Math.ceil(source.length/550));
+  const stride=Math.max(1,Math.ceil(source.length/2400));
   for(let i=0;i<source.length;i+=stride){
     const label=source[i];
     const el=document.createElement('div');el.className='contour-label';
     el.textContent=elevationText(label.elevation);
     el.dataset.elevation=String(label.elevation);
     el.dataset.x=String(label.x);el.dataset.z=String(label.z);
+    el.dataset.dx=String(label.dx);el.dataset.dz=String(label.dz);
     host.append(el);contourEls.push(el);
   }
   updateContourLabels();
@@ -587,19 +588,35 @@ function updateContourLabels(){
   if(!terrain)return;
   const visible=$('contours').checked;
   const rect=host.getBoundingClientRect();
+  const cellWidth=mobileQuery.matches?90:113;
+  const cellHeight=mobileQuery.matches?54:61;
+  const maxLabels=mobileQuery.matches?55:110;
   const occupied=new Set();
+  let shown=0;
   for(const el of contourEls){
     el.hidden=true;
-    if(!visible)continue;
+    if(!visible||shown>=maxLabels)continue;
     const x=Number(el.dataset.x),z=Number(el.dataset.z);
-    const p=new THREE.Vector3(x,terrain.heightAt(x,z)*exaggeration+12,z).project(camera);
+    const elevation=terrain.heightAt(x,z)*exaggeration+5;
+    const p=new THREE.Vector3(x,elevation,z).project(camera);
     if(p.z<-.99||p.z>1)continue;
     const sx=(p.x*.5+.5)*rect.width,sy=(-p.y*.5+.5)*rect.height;
-    if(sx<30||sx>rect.width-40||sy<60||sy>rect.height-38)continue;
-    const bx=Math.floor(sx/108),by=Math.floor(sy/65),key=`${bx}:${by}`;
+    if(sx<34||sx>rect.width-45||sy<65||sy>rect.height-40)continue;
+    const bx=Math.floor(sx/cellWidth),by=Math.floor(sy/cellHeight),key=`${bx}:${by}`;
     if(occupied.has(key))continue;
-    occupied.add(key);el.hidden=false;
+    // Project the actual contour-line tangent. This places the elevation
+    // *along* the line rather than as an unrelated floating altitude marker.
+    const dx=Number(el.dataset.dx),dz=Number(el.dataset.dz);
+    const ax=x-dx*.5,az=z-dz*.5,bx3=x+dx*.5,bz3=z+dz*.5;
+    const p0=new THREE.Vector3(ax,terrain.heightAt(ax,az)*exaggeration+5,az).project(camera);
+    const p1=new THREE.Vector3(bx3,terrain.heightAt(bx3,bz3)*exaggeration+5,bz3).project(camera);
+    let angle=Math.atan2(-(p1.y-p0.y)*rect.height,(p1.x-p0.x)*rect.width)*180/Math.PI;
+    if(!Number.isFinite(angle))angle=0;
+    if(angle>90)angle-=180;
+    else if(angle< -90)angle+=180;
+    occupied.add(key);shown++;el.hidden=false;
     el.style.left=`${sx}px`;el.style.top=`${sy}px`;
+    el.style.transform=`translate(-50%, -50%) rotate(${angle.toFixed(1)}deg)`;
   }
 }
 const down={x:0,y:0};
