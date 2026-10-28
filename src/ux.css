@@ -38,7 +38,7 @@
 .mobile-dock{display:none}
 .peak-marker{font-family:var(--sans);font-weight:700;text-transform:none;letter-spacing:0;font-size:11px}
 .peak-dot{width:6px;height:6px}
-.contour-label{font-family:var(--sans);font-size:10px;font-weight:700}
+.contour-label{font-family:var(--mono);font-size:10px;font-weight:700}
 @media (min-width:701px) and (max-width:1050px){
   .panel{right:14px;top:111px;width:270px;max-height:calc(100dvh - 160px)}
   .top-right{right:14px}.map-tools{left:15px}.zoom-tools{right:14px}
