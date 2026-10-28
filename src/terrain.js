@@ -174,7 +174,7 @@ export async function createTerrain(world, { quality = 'high', mobile=false, det
   mesh.receiveShadow = true;
   // Contour elevations use exact 200/400/1000-foot intervals at increasing extents.
   // Underlying DEM values and every vertex remain in actual metres.
-  const contourFeet=world.width > 125000 ? 1000 : world.width < 28000 ? 200 : 400;
+  const contourFeet=fullDetail ? 200 : world.width > 125000 ? 1000 : world.width < 28000 ? 200 : 400;
   const contourData = buildContours(nx, nz, heights, world, contourFeet / 3.280839895);
   const contour = contourData.geometry;
   const contours = new THREE.LineSegments(contour, new THREE.LineBasicMaterial({
