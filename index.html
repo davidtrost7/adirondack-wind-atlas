@@ -9,8 +9,8 @@
   <meta name="apple-mobile-web-app-title" content="Wind Atlas" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>Adirondack Wind Atlas — 3D Terrain &amp; Forecast Wind</title>
-  <link rel="stylesheet" href="./src/style.css" />
-  <link rel="stylesheet" href="./src/ux.css" />
+  <link rel="stylesheet" href="./src/style.css?v=5" />
+  <link rel="stylesheet" href="./src/ux.css?v=5" />
   <script type="importmap">
   {
     "imports": {
@@ -54,6 +54,7 @@
         <select id="region">
           <option value="summit">Mount Marcy summit · close-up</option><option value="pass">Avalanche Pass · close-up</option><option value="marcy" selected>Mount Marcy + Lake Colden · detailed</option>
           <option value="great">Great Range + Keene Valley · detailed</option>
+          <option value="highdetail">All 46 High Peaks · detailed</option>
           <option value="peaks">High Peaks Wilderness · overview</option>
           <option value="northern">Northern High Peaks</option>
           <option value="park">Adirondack Region</option>
@@ -99,7 +100,7 @@
         <input type="range" id="vertical" min="1" max="5" step="0.25" value="1" />
         <div class="slider-title"><label class="field-label" for="animation">FLOW TIME COMPRESSION</label><span id="animation-label">80×</span></div>
         <input type="range" id="animation" min="10" max="350" step="10" value="80" />
-        <label class="toggle"><input type="checkbox" id="contours" checked /><span class="check"></span>Numbered elevation contours</label>
+        <label class="toggle"><input type="checkbox" id="contours" checked /><span class="check"></span>Contour lines with in-line elevations</label>
         <label class="toggle"><input type="checkbox" id="peaks" checked /><span class="check"></span>Summit labels</label><div class="trail-count" id="peak-status">Loading named summits…</div>
       </section>
       <div class="panel-bottom"><button id="reset-view" class="secondary-btn">↗ &nbsp; RESET VIEW</button><button id="reload-data" class="secondary-btn">⟳ &nbsp; REFRESH WIND</button></div>
@@ -124,6 +125,6 @@
     <div id="loading-overlay" class="loading-overlay"><div class="loading-card"><div class="loading-orbit"></div><span class="micro">BUILDING GEOGRAPHIC SCENE</span><strong id="loading-detail">Locating DEM tiles…</strong><div class="loading-caption">Terrain and forecast data load from public services.</div></div></div>
     <footer class="credits">TRAILS <a href="https://gisservices.dec.ny.gov/arcgis/rest/services/dil/dil_trails/MapServer/2" target="_blank" rel="noopener">NYS DEC</a> · ELEVATION <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">MAPZEN / AWS</a> · WIND <a href="https://open-meteo.com/en/docs/gfs-api" target="_blank" rel="noopener">OPEN-METEO / NOAA</a> · GEOMETRY UTM 18N</footer>
   </main>
-  <script type="module" src="./src/main.js?v=4"></script>
+  <script type="module" src="./src/main.js?v=5"></script>
 </body>
 </html>
