@@ -6,28 +6,18 @@ import { fetchWind, makeWindLayer } from './wind.js';
 import { loadDECTrails, trailProfile, trailDistanceText, nearestTrail, trailGPX, loadTrailheads } from './trails.js';
 import { makeTrailLayer } from './trail-visual.js';
 import { loadImagery, setTerrainImagery } from './imagery.js';
-import { loadPeaks } from './peaks.js';
+import { loadPeaks, mergePeaks } from './peaks.js';
 
 const REGIONS = {
   summit: {name:'Mount Marcy · summit close-up',south:44.076,north:44.161,west:-73.982,east:-73.867},
   pass: {name:'Avalanche Pass · close-up',south:44.111,north:44.175,west:-74.009,east:-73.929},
   marcy: { name: 'Mount Marcy + Lake Colden', south: 44.035, north: 44.225, west: -74.065, east: -73.805 },
   great: { name: 'Great Range + Keene Valley', south: 44.045, north: 44.245, west: -73.965, east: -73.690 },
+  highdetail: { name: 'All 46 High Peaks · detailed', south: 44.025, north: 44.416, west: -74.255, east: -73.665 },
   peaks: { name: 'High Peaks Wilderness', south: 43.975, north: 44.295, west: -74.205, east: -73.650 },
   northern: { name: 'Northern High Peaks', south: 44.015, north: 44.515, west: -74.345, east: -73.560 },
   park: { name: 'Adirondack Region', south: 42.920, north: 45.045, west: -75.570, east: -73.255 },
 };
-const SUMMITS = [
-  { name: 'MOUNT MARCY', lat: 44.1126, lon: -73.9237 },
-  { name: 'ALGONQUIN', lat: 44.1438, lon: -73.9867 },
-  { name: 'HAYSTACK', lat: 44.1058, lon: -73.9002 },
-  { name: 'GIANT', lat: 44.1613, lon: -73.7205 },
-  { name: 'COLDEN', lat: 44.1269, lon: -73.9671 },
-  { name: 'SKYLIGHT', lat: 44.0996, lon: -73.9300 },
-  { name: 'WHITEFACE', lat: 44.3659, lon: -73.9027 },
-  { name: 'CASCADE', lat: 44.2186, lon: -73.8596 },
-  { name: 'GOTHICS', lat: 44.1276, lon: -73.8580 },
-];
 const $ = id => document.getElementById(id);
 const host = $('canvas-host');
 const mobileQuery = window.matchMedia('(max-width: 700px)');
@@ -161,7 +151,7 @@ scene.add(fill);
 const raycaster = new THREE.Raycaster();
 let terrain = null, wind = null, weather = null, world = null;
 let trailLayer=null, trailRecords=[], selectedTrail=null, locationOverlay=null;
-let imagery=null, peakData=SUMMITS, contourEls=[];
+let imagery=null, peakData=[], contourEls=[];
 let regionKey = 'marcy', abort = null, rebuildSerial = 0;
 let windRefreshSerial=0, windAbort=null;
 let exaggeration = 1, windHeight = 10, windSpeedup = 80;
@@ -301,7 +291,7 @@ async function buildRegion() {
   setLoading('Retrieving elevation tiles…');
   scene.fog = new THREE.FogExp2('#0b171c', 0.16/Math.max(world.width,world.depth));
   // Launch both operations, but do not block terrain rendering on the weather service.
-  const imageryPromise=loadImagery(world,{mobile:mobileQuery.matches,signal}).then(value=>({value}),error=>({error}));
+  const imageryPromise=loadImagery(world,{mobile:mobileQuery.matches,detailRegion:regionKey==='highdetail',quality:$('quality').value,signal}).then(value=>({value}),error=>({error}));
   const peaksPromise=loadPeaks(REGIONS[regionKey],{signal}).then(value=>({value}),error=>({error}));
   const trailheadsPromise=loadTrailheads(world,{signal}).then(value=>({value}),error=>({error}));
   const trailsPromise=loadDECTrails(world,{
@@ -313,7 +303,7 @@ async function buildRegion() {
   }}).then(value=>({value}),error=>({error}));
   try {
     const result=await createTerrain(world,{
-      quality:$('quality').value,mobile:mobileQuery.matches,signal,onProgress:m=>{
+      quality:$('quality').value,mobile:mobileQuery.matches,detailRegion:regionKey==='highdetail',signal,onProgress:m=>{
         if(serial===rebuildSerial)setLoading(m);
       },
     });
@@ -322,7 +312,8 @@ async function buildRegion() {
     scene.add(terrain.mesh, terrain.contours);
     terrain.setVerticalScale(exaggeration);
     terrain.contours.visible=$('contours').checked;
-    peakData=SUMMITS;makePeaks();makeContourLabels();updateUnitDisplays();
+    peakData=mergePeaks(REGIONS[regionKey]);makePeaks();makeContourLabels();updateUnitDisplays();
+    $('peak-status').textContent=`${peakData.length} traditional High Peaks in extent · offline names ready`;
     resetView();
     imageryPromise.then(outcome=>{
       if(serial!==rebuildSerial||!terrain){outcome.value?.dispose();return;}
@@ -332,11 +323,11 @@ async function buildRegion() {
     });
     peaksPromise.then(outcome=>{
       if(serial!==rebuildSerial||!terrain)return;
-      if(outcome.value?.peaks?.length){peakData=outcome.value.peaks;makePeaks();
-        $('peak-status').textContent=`${peakData.length} named OSM summits in extent`;}
-      else $('peak-status').textContent=outcome.value?.limited
-        ? 'Regional map: choose a closer area to load more summit names'
-        : 'Summit service unavailable · showing a limited local fallback';
+      peakData=mergePeaks(REGIONS[regionKey],outcome.value?.peaks);
+      makePeaks();
+      const core=peakData.filter(p=>p.highPeak).length;
+      const additional=peakData.length-core;
+      $('peak-status').textContent=`${core} of 46 High Peaks inside extent · ${additional} additional names${outcome.error?' (OSM unavailable)':outcome.value?.limited?' (regional OSM skipped)':''}`;
     });
     $('model-tag').textContent=`DEM z${terrain.demZoom} · ${terrain.nx}×${terrain.nz} GRID`;
     trailheadsPromise.then(outcome=>{if(serial===rebuildSerial&&terrain&&outcome.value)makeTrailheads(outcome.value);});
@@ -532,7 +523,8 @@ function makePeaks() {
     const xy=world.toScene(summit.lat,summit.lon);
     if(Math.abs(xy.x)>world.width*.5||Math.abs(xy.z)>world.depth*.5)continue;
     const marker=document.createElement('div');
-    marker.className='peak-marker';
+    marker.className=summit.highPeak?'peak-marker high-peak':'peak-marker';
+    marker.title=summit.highPeak?`Traditional Adirondack High Peak: ${summit.name}`:summit.name;
     const dot=document.createElement('div');dot.className='peak-dot';
     const title=document.createElement('span');title.textContent=summit.name;
     marker.append(dot,title);host.append(marker);
@@ -540,6 +532,7 @@ function makePeaks() {
     marker.dataset.x=String(xy.x);
     marker.dataset.z=String(xy.z);
     marker.dataset.importance=String(summit.importance||0);
+    marker.dataset.highPeak=summit.highPeak?'true':'false';
   }
   updatePeaks();
 }
@@ -550,22 +543,27 @@ function updatePeaks(){
   const shown=[];
   const candidates=[];
   const labelMode=$('label-density').value;
-  const maxNames=labelMode==='all'?150:labelMode==='more'?(mobileQuery.matches?38:100):(mobileQuery.matches?16:32);
+  const extraLimit=labelMode==='all'?150:labelMode==='more'?(mobileQuery.matches?38:100):(mobileQuery.matches?16:32);
   for(const el of peakEls){
     const x=Number(el.dataset.x),z=Number(el.dataset.z);
     const p=new THREE.Vector3(x,terrain.heightAt(x,z)*exaggeration+45,z).project(camera);
     const sx=(p.x*.5+.5)*rect.width,sy=(-p.y*.5+.5)*rect.height;
     el.hidden=true;
     if(visible&&p.z>=-1&&p.z<=1&&sx>12&&sx<rect.width-12&&sy>12&&sy<rect.height-12)
-      candidates.push({el,sx,sy,priority:Number(el.dataset.importance)});
+      candidates.push({el,sx,sy,priority:Number(el.dataset.importance),core:el.dataset.highPeak==='true'});
   }
   candidates.sort((a,b)=>b.priority-a.priority);
+  let extrasShown=0;
   for(const c of candidates){
-    // Actual labels are compact. Cull overlapping TEXT, not whole 100 px cells.
-    const textWidth=Math.min(140,15+c.el.textContent.length*5.7);
-    const r={l:c.sx-5,t:c.sy-10,r:c.sx+textWidth,b:c.sy+10};
-    if(shown.length>=maxNames)break;
-    if(labelMode!=='all'&&shown.some(q=>r.l<q.r+(labelMode==='more'?0:5)&&r.r>q.l-(labelMode==='more'?0:5)&&r.t<q.b+1&&r.b>q.t-1))continue;
+    // Every traditional High Peak within the visible map gets a label at every
+    // extent and density setting. Only optional OSM names are density-culled.
+    const textWidth=Math.min(180,20+c.el.textContent.length*(c.core?5.4:5.7));
+    const r={l:c.sx-5,t:c.sy-11,r:c.sx+textWidth,b:c.sy+11};
+    if(!c.core){
+      if(extrasShown>=extraLimit)continue;
+      if(labelMode!=='all'&&shown.some(q=>r.l<q.r+3&&r.r>q.l-3&&r.t<q.b+2&&r.b>q.t-2))continue;
+      extrasShown++;
+    }
     shown.push(r);c.el.hidden=false;
     c.el.style.left=`${c.sx}px`;c.el.style.top=`${c.sy}px`;
   }
