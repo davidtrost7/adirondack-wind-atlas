@@ -5,7 +5,7 @@
 - **Map-first navigation:** phone bottom dock with Map / Trails / Wind / Display panels. Tap the same tab to dismiss the panel. Desktop controls use the same tab categories.
 - **US customary units by default:** terrain and trail elevations in feet; distances in feet/miles; wind in mph. Switch to metric under Display. Source geometry remains UTM 18N metres. Round-foot contours use 200 ft in close-up views, 400 ft across the High Peaks, or 1,000 ft in the broad regional view, with alternate index contours labelled.
 - **Compass:** floating north arrow rotates with the camera and resets the view to north when tapped, without changing the selected location.
-- **More mountain names:** fetch named peak and hill nodes/ways from OSM, expose label-density options, and report count/fallback status. These are mapped features, not a guarantee every named summit exists in OSM.
+- **Every traditional High Peak:** the official list of 46 Adirondack High Peaks is always available as an embedded, geographically placed label catalog, including on the park-wide map and when OpenStreetMap is offline. Other mountain names come from live OSM data where available; optional names may be collision-culled, but the 46 summit labels are always shown when geographically inside the selected extent. Very wide overviews may have overlapping names on small screens.
 - **Automatic forecast refresh:** on initial load, every 30 minutes while the tab is active, and when returning to a tab that is past due. The display shows local fetch time and a next-refresh indicator. A failed refresh retains existing forecast and marks the status; it does not silently fabricate winds. This is periodic re-fetching of model predictions, not live sensor telemetry.
 - **Forecast timeline:** starts paused at the forecast hour nearest the current time instead of playing through future hours automatically. Press Play to animate.
 - **Validation:** GitHub Actions runs `npm test` after each push; check the latest run in the Actions tab.
@@ -59,7 +59,7 @@ Find the computer's LAN IP (`hostname -I` on Linux), then open `http://LAN_IP:80
 
 - **Geographic scale:** WGS84 coordinates transformed to UTM zone 18N; scene X/Z distances in metres. Vertical relief starts at **1× true scale**. Optional elevation exaggeration explicitly indicates its scale factor.
 - **Elevation detail:** Select *Standard*, *High*, or *Ultra*. The map requests higher-zoom Mapzen/Terrarium DEM tiles for smaller regions (up to zoom 14), instead of merely subdividing a coarse raster. Terrain mesh density is also increased. Effective source accuracy remains bounded by the underlying DEM quality; higher tile zoom does **not** guarantee true 10 m, 1 m, or LiDAR-grade source elevation everywhere.
-- **Focal areas:** Marcy + Lake Colden (default), Great Range + Keene Valley, High Peaks overview, Northern High Peaks, and Adirondack Region. The park-wide setting uses a much coarser mesh and explicitly disables trail loading to avoid enormous GIS downloads.
+- **Focal areas:** Marcy + Lake Colden (default), Great Range + Keene Valley, **All 46 High Peaks · detailed**, High Peaks overview, Northern High Peaks, and Adirondack Region. The new full-46 detailed view covers Whiteface and Esther to the north, the Seward and Santanoni groups to the west, and Dix/Grace to the south/east. At High and Ultra detail it loads DEM zoom 14 (up to 810 terrain tiles) with a mesh sampled densely enough to preserve focused-view detail. Satellite imagery loads at zoom 13 for this wider area; this is an intentionally larger download and higher graphics-memory workload than the default map. Standard mode remains available. The park-wide setting remains coarser and explicitly disables trail loading.
 - **Official trail overlay:** A *live* spatial query against NYSDEC's hiking-trail GIS dataset, with automatic fallback to DEC's ArcGIS-hosted feature copy. Mapped line segments are draped onto the DEM. Available trail blaze colors are blue/red/yellow or unclassified. Search results show **visible mapped segment lengths**, not a promised trailhead-to-summit itinerary or round trip.
 - **Trail details:** Tap a trail line (near a map-tap point) or search for its name to inspect visible mapped length, an approximate DEM-derived ascent and min/max elevation, and a **GPX export of that visible fragment**. Search results containing similar names are separate source GIS features, not stitched routes.
 - **Trailheads:** Optional individual points from NYSDEC's separate mapped trailhead layer. Not all hiking access points or parking areas are included. A trailhead point does not establish vehicle parking or public access.
@@ -68,7 +68,7 @@ Find the computer's LAN IP (`hostname -I` on Linux), then open `http://LAN_IP:80
 - **Overhead map:** Orthographic, north-up camera with touch pan/zoom, not just a tilted perspective. Toggle 2D / 3D with one button.
 - **GPS:** A manually requested, *one-time* location fix from the device. Accuracy circle is based on the browser's reported uncertainty. No route following, track recording, position logging, or background GPS.
 - **Wind:** Animated **4.5-pixel-wide streamlines** with adjustable width (1.5–9 px) and density (40–300 paths), plus optional enlarged directional arrows. Open-Meteo 10 m / 80 m wind forecasts (HRRR requested first, best-match fallback). The map first displays an explicitly labelled single-location forecast, then upgrades to a 5×5 or 3×3 regional grid if a multi-location request succeeds. Refresh follows the same progressive strategy. Streamline curvature is an interpolation of sampled *horizontal* wind components, not a simulation of air being forced through terrain. Wind may still be unavailable when the provider cannot be reached.
-- **Summits & contours:** Load named OSM `natural=peak` positions when the public Overpass API responds, with a small offline fallback list. Camera-aware text collision avoidance keeps the map readable; numbered index contour labels (metres) are projected onto the DEM. Contours are drawn every 50/100/200 m depending on footprint; numeric labels are sparser than the line spacing.
+- **Summits & contours:** Every one of the traditional 46 High Peaks has a permanently bundled (approximate, not navigational) coordinate and a priority summit label. Other names come from OSM `natural=peak|hill` when the public Overpass API responds. Contour intervals are 200, 400, or 1,000 feet depending on extent, and elevations are printed **on the contour line**, rotated along its projected tangent; labels are thinned in screen space to avoid clutter.
 
 ## Controls
 
@@ -110,7 +110,7 @@ GIS trail data can be incomplete, offset from historical GPS routes, or outdated
 - `src/geo.js` — WGS84 / UTM zone 18N projection
 - `src/terrain.js` — DEM tile loader, sampling, geometry and contour index-label candidates
 - `src/imagery.js` — Esri World Imagery mosaic and georegistered UV coordinates
-- `src/peaks.js` — live OpenStreetMap summit name loading
+- `src/peaks.js` — all 46 bundled summit labels plus live OpenStreetMap names
 - `src/trails.js` — official DEC GeoJSON access, clipping, metrics and GPX
 - `src/trail-visual.js` — thick line and highlight rendering
 - `src/wind.js` — forecast queries, wind vectors and flow graphics
@@ -120,6 +120,6 @@ GIS trail data can be incomplete, offset from historical GPS routes, or outdated
 
 ## Validation and limitations
 
-Run `npm test` (Node.js required for tests only). Tests cover projection round trips, meteorological wind-vector orientation and parsing, trail clipping into the map, search geometry, trail distances, elevation profile arithmetic, GPX structure, trailhead parsing, and query parameter generation. Browser markup/CSS has additionally been inspected at phone and desktop viewport sizes.
+Run `npm test` (Node.js required for tests only). Tests cover 46-summit completeness, offline peak matching, projection round trips, meteorological wind-vector orientation and parsing, trail clipping into the map, search geometry, trail distances, elevation profile arithmetic, GPX structure, trailhead parsing, and query parameter generation. Browser markup/CSS has additionally been inspected at phone and desktop viewport sizes.
 
 **External network requests and live WebGL rendering could not be tested end-to-end in the development environment.** The DEC ArcGIS services and Mapzen/Open-Meteo endpoints are documented and were checked for API capabilities, but live browser CORS, endpoint reliability, rendered trail alignment, and on-device frame rate remain to be verified in a network-enabled browser. This is a working prototype, not a production-validated offline hiking map.
